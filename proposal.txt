@@ -1,0 +1,41 @@
+Project: Text-Based Calculator with Simple Algebra Support
+
+For my final project, I plan to design and create a text-based calculator that parses and evaluates mathematical expressions entered by the user into stdin.
+
+Goals:
+Easy Goals
+- Implement a tokenizer and parser for arithmetic expressions.
+- Support the core PEMDAS operations (with the exception of exponents):
+- Parentheses
+- Multiplication and division
+- Addition and subtraction
+- Provide a simple command-line interface for entering expressions.
+
+Medium Goals
+- Add support for a single variable (e.g., x).
+- Implement algebraic solving for simple linear equations such as:
+- Improve error handling for bad input.
+
+Challenge Goals
+- Add exponent support if time allows
+- Simplifying expressions
+- Solving of more complex one variable equations
+- Create REPL interface to allow for multiple uses
+
+
+Technical Skills
+- Pattern Matching
+- ADTS
+- Recursive Data Structures
+- Monads
+- I/O
+
+New Topics
+- Parsing
+- Parser Libraries (Optional)
+
+Existing Resources
+- There exist a few guides for creating parsers for a symbolic calculator in Haskell. However, I have not seen any that implement the ability to calculate variables in algebraic expressions.
+
+Why this project?
+- I have been thinking about a project like this since working on some functions for a matrix calculator in APCS in high school, but have not had the time or drive to start it. Haskell's pattern matching seems like the best tool to implement text-based input for a calculator like this.
