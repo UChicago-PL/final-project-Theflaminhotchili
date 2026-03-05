@@ -1,0 +1,9 @@
+Current Progress:
+Parser
+Expr Data structure
+
+Plans:
+Implement system for evaluating simple expressions
+Isolating variables
+
+New Plans:
