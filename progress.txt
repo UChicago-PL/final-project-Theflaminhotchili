@@ -6,4 +6,12 @@ Plans:
 Implement system for evaluating simple expressions
 Isolating variables
 
-New Plans:
+Scope Increase:
+- Parsing proved to be pretty easy with ReadP, so I feel like an increase in
+  scope is needed
+- New goals include:
+  Systems for variables in exponents
+  Simple systems of equations solving
+- New stretch goals include:
+  Quadratic solving
+  2 variable graphing
