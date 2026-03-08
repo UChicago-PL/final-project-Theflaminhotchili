@@ -58,3 +58,14 @@ parseInput input = case filter (null . snd) (readP_to_S expr input) of
 -- ======================================= --
 -- ======== EXPRESSION EVALUATION ======== --
 -- ======================================= --
+
+evalExpr :: Expr -> Double
+evalExpr e = case e of
+ BinOp Add g f -> (evalExpr g) + (evalExpr f)
+ BinOp Sub g f -> (evalExpr g) - (evalExpr f)
+ BinOp Mul g f -> (evalExpr g) * (evalExpr f)
+ BinOp Div g f -> (evalExpr g) / (evalExpr f)
+ BinOp Exp g f -> (evalExpr g) ** (evalExpr f)
+ Neg n -> (-1 * (evalExpr n))
+ Var _ -> 1.0
+ Num n -> n
