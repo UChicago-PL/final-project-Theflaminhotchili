@@ -1,12 +1,16 @@
 module Main where
 import Text.ParserCombinators.ReadP
 import Data.Char (isDigit, isAlpha)
+import Data.Functor.Contravariant (Equivalence)
 
 data Expr
   = Num Double
   | Var String
   | Neg Expr
   | BinOp Op Expr Expr
+  deriving (Show, Eq)
+
+data Eqn = Eqn Expr Expr
   deriving (Show, Eq)
 
 data Op = Add | Sub | Mul | Div | Exp
@@ -35,7 +39,13 @@ varOp = do
   varName <- many1 (satisfy isAlpha)
   return (Var (varName))
 
-
+eqn :: ReadP Eqn
+eqn = do
+    lhs <- expr
+    skipSpaces
+    _ <- char '='
+    skipSpaces
+    Eqn lhs <$> expr
 expr :: ReadP Expr
 expr = chainl1 term addOp
 term :: ReadP Expr
@@ -49,10 +59,14 @@ factor = between (char '(')  (char ')') expr
   <++ numOp
   <++ varOp
 
-parseInput :: String -> Expr
-parseInput input = case filter (null . snd) (readP_to_S expr input) of
-  [(result,_)] -> result
-  _ -> error "BadArgument"
+parseInput :: String -> Either Expr Eqn
+parseInput input
+  | '=' `elem` input = case filter (null . snd) (readP_to_S eqn input) of
+                       [(result,_)] -> Right result
+                       _ -> error "BadArgument"
+  | otherwise = case filter (null . snd) (readP_to_S expr input) of
+                [(result,_)] -> Left result
+                _ -> error "BadArgument"
 
 
 -- ======================================= --
