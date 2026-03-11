@@ -1,0 +1,26 @@
+Supported Features
+-Expression Evaluation
+--Solve PEMDAS expressions on real number
+-One variable Polynomial Solving
+--Solve one variable polynomials of n degree
+--No support for rational expressions, so dividing by a variable is not
+  currently supported
+-2 Variable systems of equations Solving
+--Solve any 2 equation system polynomial in one variable and linear in the otherwise
+
+
+Solving for real variables
+
+
+Task List:
+Next:
+- select ideal guesses for newton's method to find all roots of polynomial
+- add skipSpaces to parser functions
+Soon:
+- rewrite equation in terms of one variable
+- Polynomial evaluation
+Later:
+- 2 var syseq
+Far:
+- REPL Interface
+- Support for division in polynomials
