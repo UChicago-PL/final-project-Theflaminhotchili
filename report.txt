@@ -1,0 +1,107 @@
+Features:
+- Expression evaluation for all PEMDAS operations
+- Polynomial root finding
+- 2-variable systems of equations solving on polynomial variable x and linear y
+
+Usage:
+  Startup:
+  - Start program by running $ cabal run calculator-ry
+
+  Special Characters:
+  '+' - addition
+  '-' - subtraction
+  '*' - multiplication
+  '/' - division
+  '^' - exponentiation
+  '(',')' - parentheses
+  '=' - equation
+  ';' - system of equations
+  'x' - polynomial variable
+  'y' - linear responding variable
+
+  Expressions:
+  -  Enter an expression to evaluate it
+  -  Expressions of 1 polynomial variable (x) will solve for roots
+  -  Expressions of 2 or more variables or non-polynomial variables not supported
+
+  Equations:
+  -  Enter 2 expressions separated by a single '=' to input an equation
+  -  Equations of no variables will be evaluated as a logic statement
+  -  Equations of 1 polynomial variable (x) will solve for the variable
+  -  Equations of 1 polynomial (x) and 1 responding variable (y) will solve for
+     roots
+  -  Other forms of equations not supported.
+
+  Systems of Equations:
+  -  Enter 2 equations separated by a ';' operator to solve as a system of equations
+  -  Only 2-equation systems with one polynomial variable and one linear
+     variable are supported
+  -  Output is given as [(x,y)]
+  -  Be sure to include both variables in the first equation of the system
+
+  Exiting the Program:
+  - Type 'exit' or 'quit' and enter to exit program.
+
+Code Guide:
+
+Data Structures:
+Expr - ADT to represent mathematical operations, numbers, and variables, with a
+       special case for negations
+
+Op - mathematical operation type. Used in BinOp (Binary operation) form of Expr
+
+Eqn - Equation of 2 expressions
+
+SysEq - System of 2 equations
+
+Poly - Polynomial, with a list of degrees and respective coefficients of x terms
+      and y terms. While y terms are limited to only the 1 degree term, this
+      implementation is meant to allow for polynomial y in the future
+
+
+MAIN LOOP section:
+Holds main as well as functions to parse input lines, and a handler to catch
+errors and evaluate the different types of input properly within several sub
+handlers.
+
+PARSER FUNCTIONS section:
+Contains several functions to parse each form of expression, as well as Eqns and
+SysEqs.
+
+EXPRESSION EVALUATION section:
+Contains functions for evaluating expressions with no variables, evaluating
+expressions with a variable set to a value, evaluating polynomial structues with
+the x variable set to a value, and a function to differentiate an expression
+with respect to a variable
+
+POLYNOMIAL EVALUATION section:
+Contains functions to find the root of a polynomial. Uses Newton's method to
+evaluate polynomial's. Cauchy's bounds are used to bound a search area and
+Newton's method is ran on many evenly spaced points within the area.
+
+EXPRESSION CONVERSION section:
+Contains function to turn an Eqn into an expression equal to 0 by subtracting
+the right hand side from the left hand side. Also contains a function to turn
+the terms of a Poly into an Expr with a specified variable name.
+
+POLYNOMIAL AGGREGATION section:
+Contains functions to convert an Expr into a Poly and to differentiate a
+polynomial stored as a Poly with respect to the Poly's x variable.
+
+SYSTEM OF EQUATIONS SOLVING section:
+Contains functions for system of equations solving. Uses a relatively simplistic
+method of solving one equation for y in terms of x, substituting this expression
+into the other equation and solving for x, and then using the value to solve for
+y.
+
+
+
+
+
+Features I would have liked to add:
+- Custom variable names
+- Graphing
+
+Known Bugs:
+- Systems of equations can show duplicate results
+

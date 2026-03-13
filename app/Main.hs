@@ -6,6 +6,9 @@ import Data.Maybe
 import Data.Either
 import Data.List (intercalate, maximumBy, nub)
 import Data.Ord (comparing)
+import Control.Exception
+import System.IO
+import System.Exit (exitSuccess)
 
 data Expr
   = Num Double
@@ -45,7 +48,7 @@ showTerm var (d, c) = show c ++ var ++ "^" ++ show d
 instance Show Poly where
   show (Poly xt yt) =
     let
-      terms = (map (showTerm "x") xt) ++ (map (showTerm "y") yt)
+      terms = (filter (/= "") (map (showTerm "x") xt)) ++ (filter (/= "") (map (showTerm "y") yt))
     in intercalate "+" terms
 
 getCTerm :: Poly -> Double
@@ -61,7 +64,14 @@ main :: IO ()
 main = do
     putStr "> "
     input <- getLine
-    --putStrLn (show (dispatch "x" "y" (parseInput input)))
+    if input == "quit" || input == "exit"
+        then exitSuccess
+        else do
+            result <- try (handleInput input) :: IO (Either SomeException ())
+            case result of
+                Left err -> putStrLn ("Error: " ++ show err)
+                Right _  -> return ()
+            main
     main
 
 
@@ -69,14 +79,57 @@ parseInput :: String -> Either Expr (Either Eqn SysEq)
 parseInput input
   | ';' `elem` input = case filter (null . snd) (readP_to_S sysEq (filter (/= ' ') input)) of
                        [(result,_)] -> Right (Right result)
-                       _ -> error "BadArgument"
+                       _ -> error ("BadArgument: Could not find a valid system of equations in \""++input++"\"")
   | '=' `elem` input = case filter (null . snd) (readP_to_S eqn (filter (/= ' ') input)) of
                        [(result,_)] -> Right (Left result)
-                       _ -> error "BadArgument"
+                       _ -> error ("BadArgument: Could not find a valid equation in \""++input++"\"")
   | otherwise = case filter (null . snd) (readP_to_S expr (filter (/= ' ') input)) of
                 [(result,_)] -> Left result
-                _ -> error ("BadArgument: "++input)
+                _ -> error ("BadArgument: Could not find a valid expression in \""++input++"\"")
 
+
+handleInput :: String -> IO ()
+handleInput input = case parseInput input of
+    Left e          -> handleExpr e
+    Right (Left q)   -> handleEqn q
+    Right (Right sys)  -> handleSys sys
+
+handleExpr :: Expr -> IO ()
+handleExpr e = case getVars e of
+    []  -> putStrLn ("= " ++ show (evalExpr e))
+    [v] -> putStrLn ("Roots: " ++ show (findExprRoots v e))
+    _   -> putStrLn "Error: too many variables in expression"
+
+handleEqn :: Eqn -> IO ()
+handleEqn q@(Eqn l r) = case getVars (BinOp Sub l r) of
+    []       -> let lVal = evalExpr l
+                    rVal = evalExpr r
+                in putStrLn (show lVal ++ " = " ++ show rVal ++ " -> " ++ show (lVal == rVal))
+    [v]      -> putStrLn ("Roots: " ++ show (findExprRoots v (toExpr q)))
+    [v1, v2] -> let (x:y:rest) = classifyVars [v1, v2]
+                in putStrLn ("Solutions: " ++ show (findExprRoots x (isolateVar x y q)))
+    _        -> putStrLn "Error: too many variables"
+
+handleSys :: SysEq -> IO ()
+handleSys sys@(SysEq l r) =
+    let vars = nub (getVars (toExpr l) ++ getVars (toExpr r))
+    in case vars of
+        [v1, v2] -> let (x:y:rest) = classifyVars [v1, v2]
+                    in putStrLn ("Solutions: " ++ show (solveSysEq x y sys))
+        _        -> putStrLn "Error: system requires exactly 2 variables"
+
+
+getVars :: Expr -> [String] --find variables in a
+getVars = nub . findVars
+  where
+    findVars (Var v)       = [v]
+    findVars (Num _)       = []
+    findVars (Neg e)       = findVars e
+    findVars (BinOp _ f g) = findVars f ++ findVars g
+
+
+classifyVars :: [String] -> [String]
+classifyVars vars = filter (`elem` vars) ["x", "y"]
 
 
 -- ================================== --
@@ -208,19 +261,25 @@ getSamplePoints p =
       stepSize = (2*r) / (100*fromIntegral maxDeg)
   in [(-r),(-r) + stepSize .. r]
 
-newtM :: String -> Double -> Expr -> Double
-newtM v guess f =
-  let f' = diffExpr v f
-      nextGuess = guess - (evalAt v guess f) / (evalAt v guess f')
-  in if abs (nextGuess - guess) <= epsilon then nextGuess
-     else newtM v nextGuess f
+newtM :: String -> Double -> Expr -> Int -> Maybe Double
+newtM v guess f 0 = Nothing
+newtM v guess f n =
+    let f' = diffExpr v f
+        f'val = evalAt v guess f'
+        nextGuess = guess - (evalAt v guess f) / f'val
+    in if abs f'val <= epsilon then Nothing
+       else if abs (nextGuess - guess) <= epsilon then Just nextGuess
+       else newtM v nextGuess f (n-1)
 
 findExprRoots :: String -> Expr -> [Double]
 findExprRoots v f =
-  let p = toPoly v "$" f
-      guesses = getSamplePoints p
-  in nub (map (\x -> if abs (x-fromIntegral (round x)) < 1e-6 then fromIntegral (round x) else x) (cleanRoots (map (\g -> (newtM v g f)) guesses)))
-
+    let p       = toPoly v "$" f
+        guesses = getSamplePoints p
+        results = mapMaybe (\g -> newtM v g f 1000) guesses
+        rounded = map (\x -> if abs (x - fromIntegral (round x)) < 1e-6
+                             then fromIntegral (round x)
+                             else x) results
+    in nub (cleanRoots rounded)
 
 cleanRoots :: [Double] -> [Double]
 cleanRoots [] = []
@@ -351,7 +410,7 @@ expPoly p p2
 -- ======== SYSTEM OF EQUATIONS SOLVING ======== --
 -- ============================================= --
 
-isolateVar :: String -> String -> Eqn -> Expr
+isolateVar :: String -> String -> Eqn -> Expr --Solves for y in terms of x
 isolateVar x y q =
   let e = toExpr q
       p = toPoly x y e
@@ -380,6 +439,6 @@ solveSysEq x y (SysEq l r) =
       rExpr = toExpr r
       subRExpr = substVar y yExpr rExpr
       xRoots = findExprRoots x subRExpr
-  in map (\xVal -> (xVal, evalAt x xVal yExpr)) xRoots
+  in nub (map (\xVal -> (xVal, evalAt x xVal yExpr)) xRoots)
 
 
