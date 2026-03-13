@@ -17,6 +17,9 @@ data Expr
 data Eqn = Eqn Expr Expr
   deriving (Show, Eq)
 
+data SysEq = SysEq Eqn Eqn
+  deriving (Show, Eq)
+
 data Op = Add | Sub | Mul | Div | Exp
   deriving (Show, Eq)
 
@@ -48,8 +51,33 @@ instance Show Poly where
 getCTerm :: Poly -> Double
 getCTerm p = Data.Maybe.fromMaybe 0.0 (lookup 0 (xTerms p))
 
+
+-- ===================================== --
+-- ======== MAIN LOOP FUNCTIONS ======== --
+-- ===================================== --
+
+
 main :: IO ()
-main = putStrLn "Hello, Haskell!"
+main = do
+    putStr "> "
+    input <- getLine
+    --putStrLn (show (dispatch "x" "y" (parseInput input)))
+    main
+
+
+parseInput :: String -> Either Expr (Either Eqn SysEq)
+parseInput input
+  | ';' `elem` input = case filter (null . snd) (readP_to_S sysEq (filter (/= ' ') input)) of
+                       [(result,_)] -> Right (Right result)
+                       _ -> error "BadArgument"
+  | '=' `elem` input = case filter (null . snd) (readP_to_S eqn (filter (/= ' ') input)) of
+                       [(result,_)] -> Right (Left result)
+                       _ -> error "BadArgument"
+  | otherwise = case filter (null . snd) (readP_to_S expr (filter (/= ' ') input)) of
+                [(result,_)] -> Left result
+                _ -> error ("BadArgument: "++input)
+
+
 
 -- ================================== --
 -- ======== PARSER FUNCTIONS ======== --
@@ -80,6 +108,13 @@ varOp = do
   varName <- many1 (satisfy isAlpha)
   return (Var (varName))
 
+sysEq :: ReadP SysEq
+sysEq = do
+    lhs <- eqn
+    skipSpaces
+    _ <- char ';'
+    skipSpaces
+    SysEq lhs <$> eqn
 eqn :: ReadP Eqn
 eqn = do
     lhs <- expr
@@ -99,15 +134,6 @@ factor :: ReadP Expr
 factor = between (char '(')  (char ')') expr
   <++  numOp
   <++ varOp
-
-parseInput :: String -> Either Expr Eqn
-parseInput input
-  | '=' `elem` input = case filter (null . snd) (readP_to_S eqn input) of
-                       [(result,_)] -> Right result
-                       _ -> error "BadArgument"
-  | otherwise = case filter (null . snd) (readP_to_S expr input) of
-                [(result,_)] -> Left result
-                _ -> error "BadArgument"
 
 
 -- ======================================= --
@@ -182,32 +208,6 @@ getSamplePoints p =
       stepSize = (2*r) / (100*fromIntegral maxDeg)
   in [(-r),(-r) + stepSize .. r]
 
--- getSignChanges :: [(Double, Double)] -> [Double]
--- getSignChanges [] = []
--- getSignChanges [_] = [0.0]
--- getSignChanges ((x1,v1):(x2,v2):rest)
---   | v1*v2 < 0 = ((x1+x2)/2) : getSignChanges ((x2,v2):rest)
---   | otherwise = getSignChanges ((x2,v2):rest)
-
--- getCritPoints :: Poly -> [Double]
--- getCritPoints p =
---   let dp = diffPoly p
---       critGuesses = findSignChanges dp
---   in filter (\x -> abs (evalPoly x p) < epsilon) critGuesses
-
-
--- findSignChanges :: Poly -> [Double]
--- findSignChanges p =
---   let points = getSamplePoints p
---       vals = map (\x -> (x,evalPoly x p)) points
---   in getSignChanges vals
-
--- findGuesses :: Poly -> [Double]
--- findGuesses p =
---   let sc = findSignChanges p
---       cp = getCritPoints p
---   in sc ++ cp
-
 newtM :: String -> Double -> Expr -> Double
 newtM v guess f =
   let f' = diffExpr v f
@@ -225,9 +225,41 @@ findExprRoots v f =
 cleanRoots :: [Double] -> [Double]
 cleanRoots [] = []
 cleanRoots (x:y:rest)
-  | abs(x-y)<1 = (cleanRoots (x:rest))
+  | abs(x-y)<1e-3 = (cleanRoots (x:rest))
   | otherwise = x:(cleanRoots (y:rest))
 cleanRoots [x] = [x]
+
+-- ======================================= --
+-- ======== EXPRESSION CONVERSION ======== --
+-- ======================================= --
+
+toExpr :: Eqn -> Expr
+toExpr (Eqn l r) = BinOp Sub l r
+
+
+termsToExpr :: String -> [(Deg,Coef)] -> Expr
+termsToExpr x [] = (Num 0.0)
+termsToExpr x ((d,c):[])
+  | d==0 = Num c
+  | d > 0 = BinOp Mul (BinOp Exp (Var x) (Num (fromIntegral d))) (Num c)
+  | otherwise = Num 0.0
+termsToExpr x ((d,c):rest)
+  | d==0 = BinOp Add (Num c) (termsToExpr x rest)
+  | d > 0 = BinOp Add (BinOp Mul (BinOp Exp (Var x) (Num (fromIntegral d))) (Num c)) (termsToExpr x rest)
+  | otherwise = BinOp Add (Num 0) (termsToExpr x rest)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -241,7 +273,7 @@ toPoly x y e = case e of
   Var v'
     | v' == x -> Poly [(1,1),(0,0)] []
     | v' == y -> Poly [(0,0)] [(1,1)]
-    | otherwise -> error "Extra variable"
+    | otherwise -> error "Extra variable" --FIX YTERMS
   Num n -> Poly [(0,n)] []
   Neg n -> negPoly (toPoly x y n)
   BinOp Add f g -> addPoly (toPoly x y f) (toPoly x y g)
@@ -283,11 +315,11 @@ mulPoly p1 p2
   | length (xTerms p1) > 1 && not (null (yTerms p2)) = error "Cannot multiply 2 different variables"
   | length (xTerms p2) > 1 && not (null (yTerms p1)) = error "Cannot multiply 2 different variables"
   | not (null (yTerms p1)) && not (null (yTerms p2)) = error "Nonlinear in dependent variable"
-  | null (yTerms p1) = Poly (mulPolyTerms (xTerms p1) (xTerms p2)) []
   | not (null (yTerms p1)) = Poly (mulPolyTerms (xTerms p1) (xTerms p2))
-                                (applyToSnd (* getCTerm p1) (yTerms p2))
-  | otherwise = Poly (mulPolyTerms (xTerms p1) (xTerms p2))
                                 (applyToSnd (* getCTerm p2) (yTerms p1))
+  | not (null (yTerms p2)) = Poly (mulPolyTerms (xTerms p1) (xTerms p2))
+                                (applyToSnd (* getCTerm p1) (yTerms p2))
+  | otherwise = Poly (mulPolyTerms (xTerms p1) (xTerms p2)) []
 
 divPoly :: Poly -> Poly -> Poly
 divPoly p1 p2
@@ -310,3 +342,44 @@ expPoly p p2
     let e = round (getCTerm p2)
     in expRec p e
   | otherwise = error "error in exponentiation"
+
+
+
+
+
+-- ============================================= --
+-- ======== SYSTEM OF EQUATIONS SOLVING ======== --
+-- ============================================= --
+
+isolateVar :: String -> String -> Eqn -> Expr
+isolateVar x y q =
+  let e = toExpr q
+      p = toPoly x y e
+      ex = termsToExpr x (xTerms p)
+      (dy,cy) = maximumBy (comparing fst) (yTerms p)
+  in if (dy /= 1) then error "Equation is polynomial in y. Only expressions and equations linear in y are supported"
+     else BinOp Div ex (Neg (Num cy))
+
+
+substVar :: String -> Expr -> Expr -> Expr
+substVar v subst e = case e of
+  Var v'
+    | v' == v -> subst
+    | otherwise -> e
+  Num n -> e
+  Neg n -> Neg (substVar v subst n)
+  BinOp Add f g -> BinOp Add (substVar v subst f) (substVar v subst g)
+  BinOp Sub f g -> BinOp Sub (substVar v subst f) (substVar v subst g)
+  BinOp Mul f g -> BinOp Mul (substVar v subst f) (substVar v subst g)
+  BinOp Div f g -> BinOp Div (substVar v subst f) (substVar v subst g)
+  BinOp Exp f g -> BinOp Exp (substVar v subst f) (substVar v subst g)
+
+solveSysEq :: String -> String -> SysEq -> [(Double, Double)]
+solveSysEq x y (SysEq l r) =
+  let yExpr = isolateVar x y l
+      rExpr = toExpr r
+      subRExpr = substVar y yExpr rExpr
+      xRoots = findExprRoots x subRExpr
+  in map (\xVal -> (xVal, evalAt x xVal yExpr)) xRoots
+
+
